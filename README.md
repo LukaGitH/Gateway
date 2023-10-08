@@ -10,6 +10,10 @@ cd /home/pi<br/>
 sudo wget https://raw.githubusercontent.com/LukaGitH/Gateway/main/gateway_i386.sh<br/>
 sudo bash gateway_i386.sh && sudo rm gateway_i386.sh<br/>
 
+Once installed and running in Proxmox under VM's hardware you ADD usb device<br/>(USB to serial adapter with Moteino that is running PiGateway basic sketch)<br/>
+
+In Gateway UI you have to change serial port to "/dev/ttyUSB0" in Settings
+
 Gateway Home Automation & IoT Applications
 ----------------
 [![Build Status](https://app.travis-ci.com/LowPowerLab/RaspberryPi-Gateway.svg)](https://app.travis-ci.com/LowPowerLab/RaspberryPi-Gateway)
