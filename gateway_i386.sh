@@ -108,6 +108,8 @@ sudo apt-get -y install php-common php-cli php-fpm
 echo -e "${CYAN}************* STEP: Install nodeJS & npm *************${NC}"
 
 #install latest NodeJS --- https://github.com/nodesource/distributions
+#https://www.cyberithub.com/how-to-install-the-latest-version-of-node-js-on-ubuntu-debian/
+
 #if you would need specific NodeJS version, you would uncomment this and comment out lower part, that is in use now
 # wget https://nodejs.org/dist/v10.18.0/node-v10.18.0.tar.gz
 # tar -xzvf node-v10.18.0.tar.gz
