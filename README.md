@@ -1,5 +1,4 @@
-# Gateway
-socket webserver for home automation, gateway for Moteino
+This was created to be used on non RaspberryPI (I use Proxmox with raspios-bullseye for i386 systems), like virual machine in Proxmox 
 
 Gateway Home Automation & IoT Applications
 ----------------
@@ -10,6 +9,7 @@ Gateway Home Automation & IoT Applications
 [![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc-sa/4.0/)
 
 Designed and coded by [Felix Rusu](https://lowpowerlab.com/contact), Low Power Lab LLC
+Moddified for non ARM based systems by Luka Kurinčič
 <br/>
 
 ### Features:
