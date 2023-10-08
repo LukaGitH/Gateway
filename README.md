@@ -1,18 +1,19 @@
 This was created to be used on non RaspberryPI (I use Proxmox with raspios-bullseye for i386 systems), like virual machine in Proxmox 
 <br/>
 
-How to use:
-<br/>
+## How to use:
 Like original script: Open your VM/system SSH/terminal and type these commands:
 <br/>
 
+```
 cd /home/pi<br/>
 sudo wget https://raw.githubusercontent.com/LukaGitH/Gateway/main/gateway_i386.sh<br/>
 sudo bash gateway_i386.sh && sudo rm gateway_i386.sh<br/>
+```
 
-Once installed and running in Proxmox under VM's hardware you ADD usb device<br/>(USB to serial adapter with Moteino that is running PiGateway basic sketch)<br/>
+Once installed and running in Proxmox under VM's hardware you ADD `usb device`<br/>(USB to serial adapter with Moteino that is running PiGateway basic sketch)<br/>
 
-In Gateway UI you have to change serial port to "/dev/ttyUSB0" in Settings
+In Gateway UI you have to change serial port to `/dev/ttyUSB0` in Settings
 
 Gateway Home Automation & IoT Applications
 ----------------
