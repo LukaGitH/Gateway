@@ -6,9 +6,9 @@ Like original script: Open your VM/system SSH/terminal and type these commands:
 <br/>
 
 ```
-cd /home/pi<br/>
-sudo wget https://raw.githubusercontent.com/LukaGitH/Gateway/main/gateway_i386.sh<br/>
-sudo bash gateway_i386.sh && sudo rm gateway_i386.sh<br/>
+cd /home/pi
+sudo wget https://raw.githubusercontent.com/LukaGitH/Gateway/main/gateway_i386.sh
+sudo bash gateway_i386.sh && sudo rm gateway_i386.sh
 ```
 
 Once installed and running in Proxmox under VM's hardware you ADD `usb device`<br/>(USB to serial adapter with Moteino that is running PiGateway basic sketch)<br/>
