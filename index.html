@@ -535,15 +535,17 @@
   </div>
   
   <div data-role="page" id="addNodeGraphPage" data-dialog="true">
+    <div data-role="header">
+      <a href="#nodedetails" data-rel="back" class="ui-btn ui-btn-left ui-btn-icon-notext ui-icon-delete" title="Cancel"></a>
+      <h1>Select metrics</h1>
+      <a id="addNodeGraphDone" href="#" class="ui-btn ui-btn-right ui-btn-b" style="background-color:#9BFFBE;color:#000;">Done</a>
+    </div>
     <div data-role="main" class="ui-content">
-      <div class="center-wrapper" style="padding:20px">
-        <h3>Pick from available graphed metrics (any node):</h3>
+      <div class="center-wrapper" style="padding:10px 20px;">
+        <p>Select at least two metrics to include in this multigraph.</p>
       </div>
-      <select id="addNodeGraphMetrics" multiple="multiple" data-native-menu="false"></select>
-      <div class="center-wrapper">
-        <a id="addNodeGraph_OK" href="#nodedetails" class="ui-btn ui-btn-inline ui-btn-b ui-shadow ui-corner-all ui-icon-check ui-btn-icon-left ui-mini" data-rel="nodedetails" style="background-color:#9BFFBE;color:#000">Add</a>
-        <a href="#" class="ui-btn ui-btn-inline ui-shadow ui-corner-all ui-mini ui-icon-back ui-btn-icon-left" data-rel="back">Cancel</a>
-      </div>
+      <fieldset id="addNodeGraphOptions" data-role="controlgroup"></fieldset>
+      <div id="addNodeGraphMsg" class="center-wrapper" style="color:red;padding-top:10px;display:none;">Select at least two metrics.</div>
     </div>
   </div>
   
@@ -567,7 +569,7 @@
       </div>
     </div>
   </div>
-  
+
   <div data-role="page" id="addEmptyNodePage" data-dialog="true">
     <div data-role="main" class="ui-content">
       <div class="center-wrapper" style="padding:20px">
@@ -577,10 +579,6 @@
       <div class="center-wrapper" style="padding:20px">
         <span id="addEmptyNode_msg" style="padding-bottom:10px;color:red;display:block">error</span>
         <a id="addEmptyNode_OK" href="#homepage" class="ui-btn ui-btn-inline ui-btn-b ui-shadow ui-corner-all ui-icon-check ui-btn-icon-left ui-mini" data-rel="homepage" style="background-color:#9BFFBE;color:#000;">Add</a>
-        <a href="#" class="ui-btn ui-btn-inline ui-shadow ui-corner-all ui-mini ui-icon-back ui-btn-icon-left" data-rel="back">Cancel</a>
-      </div>
-    </div>
-  </div>
 
   <div data-role="page" id="metricdetails">
     <div data-role="header">
@@ -1180,8 +1178,10 @@
       }
     }
     
-    nodeMultiGraphWrapper = $('#nodeMultiGraphWrapper');
-    nodeMultiGraph = $('#nodeMultiGraph');
+    var addNodeGraphOptions = $('#addNodeGraphOptions');
+    var addNodeGraphMsg = $('#addNodeGraphMsg');
+    var nodeMultiGraphWrapper = $('#nodeMultiGraphWrapper');
+    var nodeMultiGraph = $('#nodeMultiGraph');
     var nodeGraphHeightPanel = $('#nodeGraphHeightPanel');
     var nodeGraphHeightToggle = $('#nodeGraphHeightToggle');
     var nodeGraphHeightControls = $('#nodeGraphHeightControls');
@@ -1695,6 +1695,41 @@
       var px = parseFloat(value);
       if (isNaN(px)) return null;
       return px;
+    }
+
+    function sanitizeOptionId(nodeId, metricKey) {
+      var safeNode = String(nodeId).replace(/[^a-z0-9]/gi,'_');
+      var safeMetric = String(metricKey).replace(/[^a-z0-9]/gi,'_');
+      return 'node-mg-'+safeNode+'-'+safeMetric;
+    }
+
+    function populateNodeGraphOptions() {
+      addNodeGraphOptions.empty();
+      addNodeGraphMsg.hide();
+      var hasOptions = false;
+      var nodeList = Object.keys(nodes).map(function(nodeKey) { return nodes[nodeKey]; }).filter(function(node) { return !!node; });
+      nodeList.sort(function(a, b) {
+        var labelA = (getNodeDisplayName(a._id) || '').toString().toLowerCase();
+        var labelB = (getNodeDisplayName(b._id) || '').toString().toLowerCase();
+        if (labelA === labelB) return (''+a._id).localeCompare(''+b._id, undefined, {numeric:true});
+        return labelA.localeCompare(labelB);
+      });
+      nodeList.forEach(function(node) {
+        if (!node.metrics) return;
+        Object.keys(node.metrics).forEach(function(metricKey) {
+          var metric = node.metrics[metricKey];
+          if (!metric || !metric.graph) return;
+          hasOptions = true;
+          var optionId = sanitizeOptionId(node._id, metricKey);
+          var checkbox = $('<input type="checkbox">').attr({id:optionId, value:(node._id+'::'+metricKey)});
+          var label = $('<label></label>').attr('for', optionId).text((metric.label || metricKey)+' ['+node._id+']');
+          addNodeGraphOptions.append(checkbox).append(label);
+        });
+      });
+      if (!hasOptions) {
+        addNodeGraphOptions.append('<p class="center-wrapper">No logged metrics available for multigraphs.</p>');
+      }
+      addNodeGraphOptions.trigger('create');
     }
 
     function paletteColor(index) {
@@ -2564,42 +2599,9 @@
       $('#nodeIconUpload').val('');
     });
 
+
     $('#addNodeGraph').click("tap", function(event) {
-      var multigraphSelect = $("#addNodeGraphMetrics");
-      multigraphSelect.empty();
-      $('#addNodeGraph_OK').hide();
-      multigraphSelect.append('<option value="">Select metrics...</option>');
-
-      var nodeList = Object.keys(nodes).map(function(nodeKey) { return nodes[nodeKey]; }).filter(function(node) { return !!node; });
-      nodeList.sort(function(a, b) {
-        var labelA = (getNodeDisplayName(a._id) || '').toString().toLowerCase();
-        var labelB = (getNodeDisplayName(b._id) || '').toString().toLowerCase();
-        if (labelA === labelB) return (''+a._id).localeCompare(''+b._id, undefined, {numeric:true});
-        return labelA.localeCompare(labelB);
-      });
-
-      var hasOptions = false;
-      nodeList.forEach(function(node) {
-        if (!node.metrics) return;
-        var graphedMetrics = Object.keys(node.metrics).filter(function(metricKey) {
-          return node.metrics[metricKey] && node.metrics[metricKey].graph;
-        });
-        if (!graphedMetrics.length) return;
-        hasOptions = true;
-        var nodeId = node._id != undefined ? node._id : node.id;
-        var groupLabel = getNodeDisplayName(nodeId) + ' ['+nodeId+']';
-        var groupHtml = '<optgroup label="'+groupLabel+'">';
-        graphedMetrics.sort().forEach(function(metricKey) {
-          var metric = node.metrics[metricKey];
-          var metricText = (metric.label || metricKey) + (metric.unit ? ' ('+metric.unit+')' : '');
-          groupHtml += '<option value="' + nodeId + '::' + metricKey + '">' + metricText + '</option>';
-        });
-        groupHtml += '</optgroup>';
-        multigraphSelect.append(groupHtml);
-      });
-
-      if (!hasOptions)
-        multigraphSelect.append('<option value="" disabled>No graphed metrics available</option>');
+      populateNodeGraphOptions();
     });
 
     $('#addEmptyNode').click("tap", function(event) {
@@ -2644,9 +2646,18 @@
       socket.emit('SUBMITNODEREQUEST', selectedNodeId, reqDescr, reqValue, reqTimeout*1000);
     });
     
-    $("#addNodeGraph_OK").click("tap", function(event) {
-      var selections = $('#addNodeGraphMetrics').val() || [];
+    function submitNodeMultiGraphSelection() {
+      var selections = addNodeGraphOptions.find('input[type=checkbox]:checked').map(function(){ return $(this).val(); }).get();
+      if (selections.length < 2) {
+        addNodeGraphMsg.text('Select at least two metrics.').show();
+        return;
+      }
       socket.emit('ADDNODEGRAPH', selectedNodeId, selections);
+      $.mobile.navigate('#nodedetails');
+    }
+    $("#addNodeGraphDone").click(function(event) {
+      event.preventDefault();
+      submitNodeMultiGraphSelection();
     });
 
     $("#deleteNodeGraph").click("tap", function(event) {
@@ -2817,12 +2828,6 @@
       $( "#nav-panel" ).popup( "close" );
     });
     
-    $('#addNodeGraphMetrics').change(function() {
-      var selected = $(this).val() || [];
-      if (selected.length > 1) $('#addNodeGraph_OK').show();
-      else $('#addNodeGraph_OK').hide();
-    });
-
     $('#addEmptyNodeID').on('keyup change', function() {
       if (isNumeric($(this).val()))
       {
@@ -2894,10 +2899,6 @@
         $("#graphDeleteDataToggle").removeClass('active').css('background-color','');
         $("#graphEditDataToggle").removeClass('active').css('background-color','');
       }
-    });
-
-    $('#addNodeGraphPage').on('pagebeforeshow', function(event){
-      $("#addNodeGraphMetrics").val([]).selectmenu('refresh');
     });
 
     $('#addEvent').on('pagebeforeshow', function(event){
