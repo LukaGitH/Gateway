@@ -197,6 +197,32 @@
     border-top:1px solid rgba(255,255,255,0.2);
     bottom:0;
   }
+
+  #nodeGraphColorControls .graphColorRow {
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex-wrap:wrap;
+    margin:4px 0;
+    gap:8px;
+  }
+  #nodeGraphColorControls .graphColorRow label {
+    min-width:120px;
+    font-weight:bold;
+    margin:0;
+  }
+  #nodeGraphColorControls .graphColorPalette {
+    display:inline-flex;
+    flex-wrap:wrap;
+    gap:4px;
+  }
+  #nodeGraphColorControls .graphColorSwatch {
+    width:18px;
+    height:18px;
+    border-radius:3px;
+    border:1px solid rgba(255,255,255,0.6);
+    cursor:pointer;
+  }
   
   .content-panel {
     margin: 1em 0;
@@ -424,14 +450,20 @@
             <a id="deleteNodeGraph" href="#" data-role="button" data-icon="fa-trash" data-iconpos="notext" data-theme="a" title="delete node multigraph">REMOVE</a>
           </div>
         </div>
-        <div id="nodeGraphHeightControls" class="center-wrapper" style="margin-top:8px;">
-          <div data-role="controlgroup" data-type="horizontal" data-mini="true" style="white-space:nowrap;">
-            <label for="nodeGraphHeightInput" class="labelbold" style="line-height:32px;">Height:</label>
-            <input type="text" id="nodeGraphHeightInput" placeholder="eg. 320px or 50%" data-mini="true" style="width:140px;">
-            <a id="nodeGraphHeightApply" href="#" data-role="button" data-icon="check" data-mini="true" style="background-color:#9BFFBE;color:#000;width:auto;">Set</a>
-            <span id="nodeGraphHeightValue" style="line-height:32px;padding-left:8px;">280px</span>
+        <div id="nodeGraphHeightPanel" class="center-wrapper" style="margin-top:8px;display:none;">
+          <a id="nodeGraphHeightToggle" href="#" data-role="button" data-mini="true" data-icon="fa-arrows-v" style="background-color:#444;color:#fff;">Show height controls</a>
+          <div id="nodeGraphHeightControls" style="margin-top:6px;display:none;">
+            <div data-role="controlgroup" data-type="horizontal" data-mini="true" style="white-space:nowrap;">
+              <label for="nodeGraphHeightInput" class="labelbold" style="line-height:32px;">Height:</label>
+              <input type="text" id="nodeGraphHeightInput" placeholder="eg. 320px or 50%" data-mini="true" style="width:140px;">
+              <a id="nodeGraphHeightApply" href="#" data-role="button" data-icon="check" data-mini="true" style="background-color:#9BFFBE;color:#000;width:auto;">Set</a>
+              <span id="nodeGraphHeightValue" style="line-height:32px;padding-left:8px;">280px</span>
+            </div>
           </div>
-          <div style="font-size:11px;color:#ccc;">Tip: drag the graph bottom edge to resize as well.</div>
+        </div>
+        <div id="nodeGraphColorPanel" class="center-wrapper" style="margin-top:8px;display:none;">
+          <a id="nodeGraphColorToggle" href="#" data-role="button" data-mini="true" data-icon="fa-paint-brush" style="background-color:#444;color:#fff;">Show color palette</a>
+          <div id="nodeGraphColorControls" style="margin-top:6px;display:none;"></div>
         </div>
         <div ui-role="loadingnodemultigraph" class="ui-content center-div center-wrapper" style="display:table;height:265px;">
           <div style="display:table-cell;vertical-align:middle;">
@@ -1027,6 +1059,7 @@
     var toolTipOnItem=false;
     var editDataStart=0;
     var editDataEnd=0;
+    var multiGraphColorPalette = ['#e6194b','#3cb44b','#ffe119','#4363d8','#f58231','#911eb4','#46f0f0','#f032e6','#bcf60c','#fabebe','#008080','#e6beff','#9a6324','#fffac8','#800000','#aaffc3','#808000','#ffd8b1','#000075','#808080'];
 
     function renderGraphTooltip(event, pos, item) {
       if(!item) return;
@@ -1149,6 +1182,18 @@
     
     nodeMultiGraphWrapper = $('#nodeMultiGraphWrapper');
     nodeMultiGraph = $('#nodeMultiGraph');
+    var nodeGraphHeightPanel = $('#nodeGraphHeightPanel');
+    var nodeGraphHeightToggle = $('#nodeGraphHeightToggle');
+    var nodeGraphHeightControls = $('#nodeGraphHeightControls');
+    var nodeGraphHeightExpanded=false;
+    nodeGraphHeightPanel.hide();
+    nodeGraphHeightControls.hide();
+    var nodeGraphColorPanel = $('#nodeGraphColorPanel');
+    var nodeGraphColorToggle = $('#nodeGraphColorToggle');
+    var nodeGraphColorControls = $('#nodeGraphColorControls');
+    var nodeGraphColorsExpanded=false;
+    nodeGraphColorPanel.hide();
+    nodeGraphColorControls.hide();
     var nodeMultiGraphHeightKey = 'nodeMultiGraphHeightPx';
     var nodeMultiGraphHeightPx = 280;
     if (window.localStorage) {
@@ -1157,6 +1202,32 @@
     }
     nodeMultiGraphWrapper.height(nodeMultiGraphHeightPx);
     updateNodeGraphHeightDisplay();
+    nodeGraphHeightToggle.click(function(e) {
+      e.preventDefault();
+      if (nodeGraphHeightControls.is(':visible')) {
+        nodeGraphHeightControls.slideUp();
+        nodeGraphHeightToggle.text('Show height controls');
+        nodeGraphHeightExpanded=false;
+      }
+      else {
+        nodeGraphHeightControls.slideDown();
+        nodeGraphHeightToggle.text('Hide height controls');
+        nodeGraphHeightExpanded=true;
+      }
+    });
+    nodeGraphColorToggle.click(function(e){
+      e.preventDefault();
+      if (nodeGraphColorControls.is(':visible')) {
+        nodeGraphColorControls.slideUp();
+        nodeGraphColorToggle.text('Show color palette');
+        nodeGraphColorsExpanded=false;
+      }
+      else {
+        nodeGraphColorControls.slideDown();
+        nodeGraphColorToggle.text('Hide color palette');
+        nodeGraphColorsExpanded=true;
+      }
+    });
     function renderMultiPlot() {
       nodeMultiGraphWrapper.show();
       $("div[ui-role='loadingnodemultigraph']").hide();
@@ -1178,6 +1249,14 @@
         zoom: { interactive: true },
         //pan: { interactive: true },
       };
+      nodeGraphHeightPanel.show();
+      if (nodeGraphHeightExpanded) {
+        nodeGraphHeightControls.show();
+        nodeGraphHeightToggle.text('Hide height controls');
+      } else {
+        nodeGraphHeightControls.hide();
+        nodeGraphHeightToggle.text('Show height controls');
+      }
       //ask socket for the data
       socket.emit('GETMULTIGRAPHDATA', selectedNodeId, 0, graphView.start, graphView.end);
     }
@@ -1373,7 +1452,11 @@
 
         var points = ($("#node_graphTogglePoints").hasClass('active')) ? {show: true, radius:1, fill: false} : {};
         points = $.extend(true, points, seriesArray[skey].options.points);
-        var color = seriesArray[skey].options.colors ? seriesArray[skey].options.colors[0] : null;
+        var paletteIndex = axisIndex-1;
+        var entryMeta = getNodeMultiGraphEntry(skey);
+        var color = entryMeta && entryMeta.color ? entryMeta.color : (seriesArray[skey].options.colors ? seriesArray[skey].options.colors[0] : null);
+        color = colorStringToHex(color) || paletteColor(paletteIndex);
+        seriesArray[skey].options.colors = [color];
         var seriesContext = resolveSeriesContext(seriesArray[skey].options);
         graphData.push({data:seriesRaw, label:seriesContext.legendLabel, yaxis:axisIndex++, lines:lines, points:points, color:color});
 
@@ -1389,6 +1472,8 @@
         queryTime += seriesArray[skey].graphData.queryTime;
         logSize += seriesArray[skey].graphData.logSize;
       }
+
+      renderNodeGraphColorControls(seriesArray);
 
       $(graphStat).html(totalDataLength + (totalIntervalDatapoints != totalDataLength ? ' / '+totalIntervalDatapoints : '') +'pts ('+ queryTime+'ms) ('+humanFileSize(totalIntervalDatapoints*9)+'/'+humanFileSize(logSize)+')');
 
@@ -1610,6 +1695,116 @@
       var px = parseFloat(value);
       if (isNaN(px)) return null;
       return px;
+    }
+
+    function paletteColor(index) {
+      return multiGraphColorPalette[index % multiGraphColorPalette.length];
+    }
+
+    function colorStringToHex(color) {
+      if (!color) return null;
+      color = color.toString().trim();
+      if (color.charAt(0) === '#') {
+        if (color.length === 4) return '#' + color[1]+color[1]+color[2]+color[2]+color[3]+color[3];
+        if (color.length >= 7) return color.substring(0,7);
+      }
+      var rgbMatch = color.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+      if (rgbMatch) {
+        var hex = '#';
+        for (var i=1; i<=3; i++) {
+          var component = Math.max(0, Math.min(255, parseInt(rgbMatch[i],10)));
+          var h = component.toString(16);
+          if (h.length<2) h = '0'+h;
+          hex += h;
+        }
+        return hex;
+      }
+      return null;
+    }
+
+    function ensureMultiGraphEntryObject(entry, defaultNodeId) {
+      if (entry == null) return null;
+      if (typeof entry === 'string') return { nodeId: defaultNodeId, metricKey: entry };
+      if (typeof entry === 'object') {
+        if (entry.nodeId === undefined) entry.nodeId = defaultNodeId;
+        return entry;
+      }
+      return null;
+    }
+
+    function getNodeMultiGraphEntry(index) {
+      var node = nodes[selectedNodeId];
+      if (!node || !node.multiGraphs || !node.multiGraphs[0]) return null;
+      var entries = node.multiGraphs[0];
+      var entry = ensureMultiGraphEntryObject(entries[index], node._id);
+      if (entry && entries[index] !== entry) entries[index] = entry;
+      return entry;
+    }
+
+    function setNodeMultiGraphColor(index, color) {
+      var hex = colorStringToHex(color);
+      if (!hex) return;
+      var entry = getNodeMultiGraphEntry(index);
+      if (!entry) return;
+      entry.color = hex;
+      socket.emit('UPDATENODEGRAPHITEM', selectedNodeId, 0, index, { color: hex });
+      refreshMultiGraph(true);
+    }
+
+    function renderNodeGraphColorControls(seriesArray) {
+      if (!nodeGraphColorPanel || !nodeGraphColorControls) return;
+      var node = nodes[selectedNodeId];
+      if (!seriesArray || !node || !node.multiGraphs || !node.multiGraphs[0]) {
+        nodeGraphColorPanel.hide();
+        nodeGraphColorControls.hide();
+        nodeGraphColorToggle.text('Show color palette');
+        nodeGraphColorsExpanded=false;
+        return;
+      }
+      var selections = node.multiGraphs[0];
+      if (!selections || !selections.length) {
+        nodeGraphColorPanel.hide();
+        nodeGraphColorControls.hide();
+        nodeGraphColorToggle.text('Show color palette');
+        nodeGraphColorsExpanded=false;
+        return;
+      }
+      nodeGraphColorPanel.show();
+      nodeGraphColorControls.empty();
+      selections.forEach(function(selection, index) {
+        var normalizedEntry = ensureMultiGraphEntryObject(selection, node._id);
+        if (!normalizedEntry) return;
+        selections[index] = normalizedEntry;
+        var metricNodeId = normalizedEntry.nodeId != undefined ? normalizedEntry.nodeId : node._id;
+        var metricLabel = resolveMetricLabel(metricNodeId, normalizedEntry.metricKey, (seriesArray[index] && seriesArray[index].options.legendLbl) || normalizedEntry.metricKey) || normalizedEntry.metricKey;
+        var colorSource = normalizedEntry.color || (seriesArray[index] && seriesArray[index].options.colors && seriesArray[index].options.colors[0]) || (graphData[index] && graphData[index].color) || paletteColor(index);
+        var colorHex = colorStringToHex(colorSource) || paletteColor(index);
+        var row = $('<div class="graphColorRow"></div>');
+        row.append($('<label></label>').text(metricLabel));
+        var colorInput = $('<input type="color" class="graphColorPicker" />').attr('data-index', index).val(colorHex);
+        colorInput.on('change', function() {
+          setNodeMultiGraphColor(index, $(this).val());
+        });
+        row.append(colorInput);
+        var palette = $('<div class="graphColorPalette"></div>');
+        multiGraphColorPalette.forEach(function(pColor) {
+          var swatch = $('<span class="graphColorSwatch"></span>').css('background-color', pColor).attr('title', pColor);
+          swatch.on('click', function() {
+            colorInput.val(pColor);
+            colorInput.trigger('change');
+          });
+          palette.append(swatch);
+        });
+        row.append(palette);
+        nodeGraphColorControls.append(row);
+      });
+      if (nodeGraphColorsExpanded) {
+        nodeGraphColorControls.show();
+        nodeGraphColorToggle.text('Hide color palette');
+      } else {
+        nodeGraphColorControls.hide();
+        nodeGraphColorToggle.text('Show color palette');
+      }
     }
 
     function metricsValues(metrics, ignorePin) {
@@ -1997,17 +2192,40 @@
             refreshMultiGraph();
             $("#addNodeGraphWrapper").hide();
           }
+          nodeGraphHeightPanel.show();
+          if (!nodeGraphHeightExpanded) {
+            nodeGraphHeightControls.hide();
+            nodeGraphHeightToggle.text('Show height controls');
+          }
         }
         else
         {
           nodeMultiGraphWrapper.hide();
           $("div[ui-role='loadingnodemultigraph']").hide();
           $("#addNodeGraphWrapper").show();
+          nodeGraphHeightPanel.hide();
+          nodeGraphHeightControls.hide();
+          nodeGraphHeightToggle.text('Show height controls');
+          nodeGraphHeightExpanded=false;
+          nodeGraphColorPanel.hide();
+          nodeGraphColorControls.hide();
+          nodeGraphColorToggle.text('Show color palette');
+          nodeGraphColorsExpanded=false;
         }
 
         $('#nodeMultigraphSection').show();
       }
-      else $('#nodeMultigraphSection').hide();
+      else {
+        $('#nodeMultigraphSection').hide();
+        nodeGraphHeightPanel.hide();
+        nodeGraphHeightControls.hide();
+        nodeGraphHeightToggle.text('Show height controls');
+        nodeGraphHeightExpanded=false;
+        nodeGraphColorPanel.hide();
+        nodeGraphColorControls.hide();
+        nodeGraphColorToggle.text('Show color palette');
+        nodeGraphColorsExpanded=false;
+      }
 
       //populate events list
       $('#eventList').empty();
