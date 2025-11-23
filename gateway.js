@@ -1,4 +1,4 @@
-﻿// **********************************************************************************
+// **********************************************************************************
 // Websocket server backend for the Moteino IoT Gateway
 // Hardware and software stack details: http://lowpowerlab.com/gateway
 // This is a work in progress and is released without any warranties expressed or implied.
@@ -256,11 +256,14 @@ function normalizeMultiGraphSelection(selection, fallbackNodeId) {
   if (selection == null) return null;
   var nodeId = normalizeNodeId(fallbackNodeId);
   var metricKey = null;
+  var color = undefined;
 
   if (typeof selection === 'object') {
     metricKey = selection.metricKey || selection.name || null;
     if (selection.nodeId !== undefined && selection.nodeId !== null && selection.nodeId !== '')
       nodeId = normalizeNodeId(selection.nodeId);
+    if (selection.color && typeof selection.color === 'string')
+      color = selection.color.trim();
   }
   else if (typeof selection === 'string') {
     var parts = selection.split('::');
@@ -272,7 +275,9 @@ function normalizeMultiGraphSelection(selection, fallbackNodeId) {
   }
 
   if (!metricKey) return null;
-  return { nodeId: nodeId, metricKey: metricKey };
+  var normalized = { nodeId: nodeId, metricKey: metricKey };
+  if (color) normalized.color = color;
+  return normalized;
 }
 
 global.getNodeIcons = function(dir, files_, steps){
@@ -482,6 +487,24 @@ io.sockets.on('connection', function (socket) {
         dbNode.multiGraphs = undefined;
         db.update({ _id: dbNode._id }, { $set : dbNode}, {}, function (err, numReplaced) { /*console.log('UPDATEMETRICSETTINGS records replaced:' + numReplaced);*/ });
         io.sockets.emit('UPDATENODE', dbNode); //post it back to all clients to confirm UI changes
+      }
+    });
+  });
+
+  socket.on('UPDATENODEGRAPHITEM', function (nodeId, multiGraphId, index, properties) {
+    db.find({ _id : nodeId }, function (err, entries) {
+      if (entries.length == 1)
+      {
+        var dbNode = entries[0];
+        if (!dbNode.multiGraphs || !dbNode.multiGraphs[multiGraphId]) return;
+        var entry = dbNode.multiGraphs[multiGraphId][index];
+        if (entry === undefined) return;
+        var normalized = normalizeMultiGraphSelection(entry, dbNode._id);
+        if (!normalized) return;
+        if (properties && properties.color) normalized.color = properties.color;
+        dbNode.multiGraphs[multiGraphId][index] = normalized;
+        db.update({ _id: dbNode._id }, { $set : dbNode}, {}, function (err, numReplaced) { /*console.log('UPDATENODEGRAPHITEM records replaced:' + numReplaced);*/ });
+        io.sockets.emit('UPDATENODE', dbNode);
       }
     });
   });
@@ -696,16 +719,17 @@ io.sockets.on('connection', function (socket) {
           socket.emit(exportMode ? 'EXPORTMULTIGRAPHDATAREADY' : 'MULTIGRAPHDATAREADY', filtered);
         };
 
-        normalizedSelections.forEach(function(selection, index) {
-          var handleNode = function(targetNode) {
-            if (targetNode && targetNode.metrics && targetNode.metrics[selection.metricKey] && targetNode.metrics[selection.metricKey].graph == 1) {
-              var graphData = getGraphData(targetNode._id, selection.metricKey, start, end, exportMode);
-              graphData.options = graphData.options || {};
-              graphData.options.nodeId = targetNode._id;
-              graphData.options.nodeLabel = targetNode.label || (''+targetNode._id);
-              graphData.options.metricLabel = targetNode.metrics[selection.metricKey].label || selection.metricKey;
-              responseSeries[index] = graphData;
-            }
+          normalizedSelections.forEach(function(selection, index) {
+            var handleNode = function(targetNode) {
+              if (targetNode && targetNode.metrics && targetNode.metrics[selection.metricKey] && targetNode.metrics[selection.metricKey].graph == 1) {
+                var graphData = getGraphData(targetNode._id, selection.metricKey, start, end, exportMode);
+                graphData.options = graphData.options || {};
+                graphData.options.nodeId = targetNode._id;
+                graphData.options.nodeLabel = targetNode.label || (''+targetNode._id);
+                graphData.options.metricLabel = targetNode.metrics[selection.metricKey].label || selection.metricKey;
+                if (selection.color) graphData.options.colors = [selection.color];
+                responseSeries[index] = graphData;
+              }
             else responseSeries[index] = null;
 
             if (--pending === 0) respond();
@@ -751,6 +775,7 @@ io.sockets.on('connection', function (socket) {
           graphData.options.nodeId = targetNode._id;
           graphData.options.nodeLabel = targetNode.label || (''+targetNode._id);
           graphData.options.metricLabel = targetNode.metrics[selection.metricKey].label || selection.metricKey;
+          if (selection.color) graphData.options.colors = [selection.color];
           responseSeries[index] = graphData;
         }
         else responseSeries[index] = null;
