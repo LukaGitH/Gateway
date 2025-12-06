@@ -491,6 +491,43 @@ io.sockets.on('connection', function (socket) {
     });
   });
 
+  //Replace/update existing node multigraph while preserving per-series colors when possible
+  socket.on('SETNODEGRAPH', function (nodeId, selectedMetrics) {
+    db.find({ _id : nodeId }, function (err, entries) {
+      if (entries.length == 1)
+      {
+        var dbNode = entries[0];
+        var metricsList = Array.isArray(selectedMetrics) ? selectedMetrics : [selectedMetrics];
+        var existingGraphs = dbNode.multiGraphs || [];
+        var oldGraph = existingGraphs[0] || [];
+        var newGraph = [];
+
+        metricsList.forEach(function(metricSelection) {
+          var normalized = normalizeMultiGraphSelection(metricSelection, dbNode._id);
+          if (!normalized || !normalized.metricKey) return;
+          var selectionKey = normalized.nodeId + '::' + normalized.metricKey;
+          var existingEntry = oldGraph.find(function(entry) {
+            var normalizedExisting = normalizeMultiGraphSelection(entry, dbNode._id);
+            return normalizedExisting && (normalizedExisting.nodeId + '::' + normalizedExisting.metricKey) == selectionKey;
+          });
+          if (existingEntry && existingEntry.color) normalized.color = existingEntry.color; //keep custom color
+          if (newGraph.find(function(entry) { return (entry.nodeId + '::' + entry.metricKey) == selectionKey; })) return; //avoid dupes
+          newGraph.push(normalized);
+        });
+
+        if (newGraph.length < 2) {
+          socket.emit('LOG', 'SETNODEGRAPH FAIL: select at least 2 valid metrics');
+          return;
+        }
+
+        existingGraphs[0] = newGraph;
+        dbNode.multiGraphs = existingGraphs;
+        db.update({ _id: dbNode._id }, { $set : dbNode}, {}, function (err, numReplaced) { /*console.log('SETNODEGRAPH records replaced:' + numReplaced);*/ });
+        io.sockets.emit('UPDATENODE', dbNode);
+      }
+    });
+  });
+
   socket.on('UPDATENODEGRAPHITEM', function (nodeId, multiGraphId, index, properties) {
     db.find({ _id : nodeId }, function (err, entries) {
       if (entries.length == 1)
