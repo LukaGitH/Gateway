@@ -450,20 +450,29 @@
             <a id="deleteNodeGraph" href="#" data-role="button" data-icon="fa-trash" data-iconpos="notext" data-theme="a" title="delete node multigraph">REMOVE</a>
           </div>
         </div>
-        <div id="nodeGraphHeightPanel" class="center-wrapper" style="margin-top:8px;display:none;">
-          <a id="nodeGraphHeightToggle" href="#" data-role="button" data-mini="true" data-icon="fa-arrows-v" style="background-color:#444;color:#fff;">Show height controls</a>
-          <div id="nodeGraphHeightControls" style="margin-top:6px;display:none;">
-            <div data-role="controlgroup" data-type="horizontal" data-mini="true" style="white-space:nowrap;">
+        <div id="nodeGraphControlsPanel" class="center-wrapper" style="margin-top:8px;display:none;">
+          <a id="nodeGraphControlsToggle" href="#" data-role="button" data-mini="true" data-icon="gear" style="background-color:#444;color:#fff;">Show multigraph controls</a>
+          <div id="nodeGraphControls" style="margin-top:6px;display:none;">
+            <div data-role="controlgroup" data-type="horizontal" data-mini="true" style="white-space:nowrap;margin-bottom:6px;">
               <label for="nodeGraphHeightInput" class="labelbold" style="line-height:32px;">Height:</label>
               <input type="text" id="nodeGraphHeightInput" placeholder="eg. 320px or 50%" data-mini="true" style="width:140px;">
               <a id="nodeGraphHeightApply" href="#" data-role="button" data-icon="check" data-mini="true" style="background-color:#9BFFBE;color:#000;width:auto;">Set</a>
               <span id="nodeGraphHeightValue" style="line-height:32px;padding-left:8px;">280px</span>
             </div>
+            <div id="nodeGraphAxisControls" style="margin-bottom:6px;">
+              <label class="labelbold" style="display:block;margin-bottom:4px;">Y-Axis mode:</label>
+              <fieldset data-role="controlgroup" data-type="horizontal" data-mini="true">
+                <label for="axisModeSingle">Single</label>
+                <input type="radio" name="axisMode" id="axisModeSingle" value="single">
+                <label for="axisModeUnit">By unit</label>
+                <input type="radio" name="axisMode" id="axisModeUnit" value="unit" checked>
+                <label for="axisModePerSeries">Per series</label>
+                <input type="radio" name="axisMode" id="axisModePerSeries" value="perSeries">
+              </fieldset>
+              <div id="axisAssignmentHelp" style="font-size:12px;color:#ccc;margin-top:4px;">Units are auto-grouped; switch to single or per-series as needed.</div>
+            </div>
+            <div id="nodeGraphColorControls" style="margin-top:6px;"></div>
           </div>
-        </div>
-        <div id="nodeGraphColorPanel" class="center-wrapper" style="margin-top:8px;display:none;">
-          <a id="nodeGraphColorToggle" href="#" data-role="button" data-mini="true" data-icon="fa-paint-brush" style="background-color:#444;color:#fff;">Show color palette</a>
-          <div id="nodeGraphColorControls" style="margin-top:6px;display:none;"></div>
         </div>
         <div ui-role="loadingnodemultigraph" class="ui-content center-div center-wrapper" style="display:table;height:265px;">
           <div style="display:table-cell;vertical-align:middle;">
@@ -1065,41 +1074,54 @@
     var editDataStart=0;
     var editDataEnd=0;
     var multiGraphColorPalette = ['#e6194b','#3cb44b','#ffe119','#4363d8','#f58231','#911eb4','#46f0f0','#f032e6','#bcf60c','#fabebe','#008080','#e6beff','#9a6324','#fffac8','#800000','#aaffc3','#808000','#ffd8b1','#000075','#808080'];
+    var nodeGraphAxisModeKey = 'nodeGraphAxisMode';
+    var nodeGraphAxisMode = 'unit';
+    if (window.localStorage) {
+      var storedMode = localStorage.getItem(nodeGraphAxisModeKey);
+      if (storedMode) nodeGraphAxisMode = storedMode;
+    }
 
     function renderGraphTooltip(event, pos, item) {
-      if(!item) return;
-      if (graphOptions.yaxes[item.seriesIndex]) {
-        var date = new Date(item.datapoint[0]);
+      if(!item || !graphOptions || !graphOptions.yaxes) return;
+      var series = item.series || {};
+      var axisIdx = (series.yaxis && series.yaxis.n) ? (series.yaxis.n - 1) : ((typeof series.yaxis === 'number') ? (series.yaxis - 1) : item.seriesIndex);
+      var axisOptions = graphOptions.yaxes[axisIdx] || {};
 
-        for (var mkey in metricsDef)
-        {
-          if (metricsDef[mkey].name == graphOptions.yaxes[item.seriesIndex].metricName)
-          {
-            //The displayed value of a metric on the graph can get it's value from the following places, from lowest to highest priority:
-            // - actual raw value stored in the log
-            // - metricDef.logValue
-            // - metricDef.value
-            // - metricDef.valOverride
-            // - metricDef.value='' and metricDef.logValue='' are special - they capture the first regex match group of the raw metric (or whole match if no groups specified with regex capturing parentheses)
-            // - a specific metricDef.logValue that matches the value in the log takes priority over anything else
-            if (metricsDef[mkey].value === '' || metricsDef[mkey].logValue === '' || metricsDef[mkey].logValue === item.datapoint[1])
-            {
-              item.unit = metricsDef[mkey].unit || item.unit;
-              item.graphValPrefix = metricsDef[mkey].graphValPrefix != undefined ? metricsDef[mkey].graphValPrefix : item.graphValPrefix;
-              item.graphValSuffix = metricsDef[mkey].graphValSuffix != undefined ? metricsDef[mkey].graphValSuffix : item.graphValSuffix;
-              item.valOverride = metricsDef[mkey].valOverride || (metricsDef[mkey].value === '' ? item.datapoint[1] : metricsDef[mkey].value) || (metricsDef[mkey].logValue === '' ? item.datapoint[1] : metricsDef[mkey].logValue) || item.valOverride;
-              if (metricsDef[mkey].logValue === item.datapoint[1]) break;
-            }
+      var date = new Date(item.datapoint[0]);
+      var seriesLabel = series.label || axisOptions.metricName || axisOptions.axisLabel || axisOptions.legendLbl || 'Metric';
+      var unit = axisOptions.unit || series.unit || item.unit || '';
+      var graphValPrefix = axisOptions.graphValPrefix || series.graphValPrefix || item.graphValPrefix || '';
+      var graphValSuffix = axisOptions.graphValSuffix || series.graphValSuffix || item.graphValSuffix || '';
+      var seriesNodeId = series.nodeId || axisOptions.nodeId || selectedNodeId;
+      var seriesMetricKey = series.metricName || axisOptions.metricName;
+      if (nodes[seriesNodeId] && nodes[seriesNodeId].metrics && nodes[seriesNodeId].metrics[seriesMetricKey]) {
+        var m = nodes[seriesNodeId].metrics[seriesMetricKey];
+        unit = unit || m.unit || '';
+        graphValPrefix = graphValPrefix || m.graphValPrefix || '';
+        graphValSuffix = graphValSuffix || m.graphValSuffix || '';
+      }
+      if ((!graphValSuffix || !unit) && metricsDef && metricsDef.metrics) {
+        for (var mk in metricsDef.metrics) {
+          var def = metricsDef.metrics[mk];
+          if (def && def.name == seriesMetricKey) {
+            unit = unit || def.unit || '';
+            graphValPrefix = graphValPrefix || def.graphValPrefix || '';
+            graphValSuffix = graphValSuffix || def.graphValSuffix || '';
+            break;
           }
         }
-
-        toolTipOnItem = true;
-        var val = date.format("mmm-d, ") + '<b>' + date.format('h:MM')+'</b>'+date.format('tt')+'<br/><b>' + (item.graphValPrefix||'') + (item.valOverride || item.datapoint[1]/*.toFixed(2)*/) + '</b>' + (item.unit || '') + (item.graphValSuffix||'');
-        $("#tooltip").html(val)
-          .css({top: item.pageY-40, left: item.pageX+7})
-          .show();
       }
-      else if (toolTipOnItem) { hideTooltip(); toolTipOnItem=false; }
+      // if suffix already contains unit, avoid double-appending, otherwise append both
+      if (unit && graphValSuffix && graphValSuffix.indexOf(unit) !== -1) unit = '';
+      var valOverride = item.valOverride || series.valOverride || item.datapoint[1];
+
+      toolTipOnItem = true;
+      var val = date.format("mmm-d, ") + '<b>' + date.format('h:MM')+'</b>'+date.format('tt')
+              + '<br/><b>' + graphValPrefix + valOverride + '</b>' + unit + graphValSuffix
+              + '<br/><span style="font-size:11px;">' + seriesLabel + '</span>';
+      $("#tooltip").html(val)
+        .css({top: item.pageY-40, left: item.pageX+7})
+        .show();
     }
 
     function plotClick(event, pos, item) {
@@ -1190,18 +1212,17 @@
     var nodeGraphEditMode = false;
     var addNodeGraphOptions = $('#addNodeGraphOptions');
     var addNodeGraphMsg = $('#addNodeGraphMsg');
-    var nodeGraphHeightPanel = $('#nodeGraphHeightPanel');
-    var nodeGraphHeightToggle = $('#nodeGraphHeightToggle');
-    var nodeGraphHeightControls = $('#nodeGraphHeightControls');
-    var nodeGraphHeightExpanded=false;
-    nodeGraphHeightPanel.hide();
-    nodeGraphHeightControls.hide();
-    var nodeGraphColorPanel = $('#nodeGraphColorPanel');
-    var nodeGraphColorToggle = $('#nodeGraphColorToggle');
+    var nodeGraphControlsPanel = $('#nodeGraphControlsPanel');
+    var nodeGraphControlsToggle = $('#nodeGraphControlsToggle');
+    var nodeGraphControls = $('#nodeGraphControls');
     var nodeGraphColorControls = $('#nodeGraphColorControls');
-    var nodeGraphColorsExpanded=false;
-    nodeGraphColorPanel.hide();
-    nodeGraphColorControls.hide();
+    var axisModeRadios = $('input[name="axisMode"]');
+    var nodeGraphControlsExpanded=false;
+    nodeGraphControlsPanel.hide();
+    nodeGraphControls.hide();
+    var nodeGraphControlsExpanded=false;
+    nodeGraphControlsPanel.hide();
+    nodeGraphControls.hide();
     var nodeMultiGraphHeightKey = 'nodeMultiGraphHeightPx';
     var nodeMultiGraphHeightPx = 280;
     if (window.localStorage) {
@@ -1210,30 +1231,33 @@
     }
     nodeMultiGraphWrapper.height(nodeMultiGraphHeightPx);
     updateNodeGraphHeightDisplay();
-    nodeGraphHeightToggle.click(function(e) {
-      e.preventDefault();
-      if (nodeGraphHeightControls.is(':visible')) {
-        nodeGraphHeightControls.slideUp();
-        nodeGraphHeightToggle.text('Show height controls');
-        nodeGraphHeightExpanded=false;
+    nodeGraphControlsPanel.show();
+    try {
+      if (axisModeRadios.checkboxradio) {
+        axisModeRadios.checkboxradio();
+        axisModeRadios.filter('[value="'+nodeGraphAxisMode+'"]').prop('checked', true).checkboxradio('refresh');
+      } else {
+        axisModeRadios.filter('[value="'+nodeGraphAxisMode+'"]').prop('checked', true);
       }
-      else {
-        nodeGraphHeightControls.slideDown();
-        nodeGraphHeightToggle.text('Hide height controls');
-        nodeGraphHeightExpanded=true;
-      }
+    } catch(e) {
+      axisModeRadios.filter('[value="'+nodeGraphAxisMode+'"]').prop('checked', true);
+    }
+    axisModeRadios.change(function() {
+      nodeGraphAxisMode = $('input[name="axisMode"]:checked').val() || 'unit';
+      if (window.localStorage) localStorage.setItem(nodeGraphAxisModeKey, nodeGraphAxisMode);
+      refreshMultiGraph(true);
     });
-    nodeGraphColorToggle.click(function(e){
+    nodeGraphControlsToggle.click(function(e) {
       e.preventDefault();
-      if (nodeGraphColorControls.is(':visible')) {
-        nodeGraphColorControls.slideUp();
-        nodeGraphColorToggle.text('Show color palette');
-        nodeGraphColorsExpanded=false;
+      if (nodeGraphControls.is(':visible')) {
+        nodeGraphControls.slideUp();
+        nodeGraphControlsToggle.text('Show multigraph controls');
+        nodeGraphControlsExpanded=false;
       }
       else {
-        nodeGraphColorControls.slideDown();
-        nodeGraphColorToggle.text('Hide color palette');
-        nodeGraphColorsExpanded=true;
+        nodeGraphControls.slideDown();
+        nodeGraphControlsToggle.text('Hide multigraph controls');
+        nodeGraphControlsExpanded=true;
       }
     });
     function renderMultiPlot() {
@@ -1257,13 +1281,13 @@
         zoom: { interactive: true },
         //pan: { interactive: true },
       };
-      nodeGraphHeightPanel.show();
-      if (nodeGraphHeightExpanded) {
-        nodeGraphHeightControls.show();
-        nodeGraphHeightToggle.text('Hide height controls');
+      nodeGraphControlsPanel.show();
+      if (nodeGraphControlsExpanded) {
+        nodeGraphControls.show();
+        nodeGraphControlsToggle.text('Hide multigraph controls');
       } else {
-        nodeGraphHeightControls.hide();
-        nodeGraphHeightToggle.text('Show height controls');
+        nodeGraphControls.hide();
+        nodeGraphControlsToggle.text('Show multigraph controls');
       }
       //ask socket for the data
       socket.emit('GETMULTIGRAPHDATA', selectedNodeId, 0, graphView.start, graphView.end);
@@ -1421,11 +1445,13 @@
     socket.on('MULTIGRAPHDATAREADY', function(seriesArray){
       graphData = [];
       var margin = 0;
-      var axisIndex=1;
       var totalDataLength=0;
       var totalIntervalDatapoints=0;
       var queryTime = 0;
       var logSize = 0;
+      var axisIndex=1;
+      var axisMap = {};
+      var seriesProcessed = [];
       
       //make sure to extend min/max if any data point is outside the defined graph range
       for(var skey in seriesArray) {
@@ -1451,8 +1477,8 @@
 
         margin=(max-min) * (yaxisOptions.autoscaleMargin || graphOptions.yaxis.autoscaleMargin); //defining the upper and lower margin
         if (min==max) margin=(yaxisOptions.autoscaleMargin || graphOptions.yaxis.autoscaleMargin) * min; // in case of only one value in the dataset (ex. motion detection)
-        if (yaxisOptions.autoscaleBottom !== false) min -= margin;
-        if (yaxisOptions.autoscaleTop !== false) max += margin;
+        var adjMin = (yaxisOptions.autoscaleBottom !== false) ? (min - margin) : min;
+        var adjMax = (yaxisOptions.autoscaleTop !== false) ? (max + margin) : max;
 
         //add data series
         var lines = {show: true, /*steps: true,*/ fill:0.15, lineWidth:1}; //same as for metric graph
@@ -1466,13 +1492,56 @@
         color = colorStringToHex(color) || paletteColor(paletteIndex);
         seriesArray[skey].options.colors = [color];
         var seriesContext = resolveSeriesContext(seriesArray[skey].options);
-        graphData.push({data:seriesRaw, label:seriesContext.legendLabel, yaxis:axisIndex++, lines:lines, points:points, color:color});
 
-        //add new yaxis
-        yaxisOptions = $.extend(true, yaxisOptions, {position:((axisIndex%2)?'right':'left'), min:min, max:max, axisLabel:seriesContext.legendLabel+' ('+seriesContext.metricLabel+')', axisLabelUseCanvas:true, axisLabelFontSizePixels:11, metricName:seriesArray[skey].options.metricName});
-        graphOptions.xaxis.min = graphView.start;
-        graphOptions.xaxis.max = graphView.end;
-        graphOptions.yaxes.push(yaxisOptions);
+        // derive unit/prefix/suffix from options, node metric, or metric defs
+        var seriesUnit = seriesArray[skey].options.unit || (seriesArray[skey].options.yaxis && seriesArray[skey].options.yaxis.unit) || '';
+        var seriesGraphValPrefix = seriesArray[skey].options.graphValPrefix || '';
+        var seriesGraphValSuffix = seriesArray[skey].options.graphValSuffix || '';
+        var nodeIdForSeries = seriesArray[skey].options.nodeId != undefined ? seriesArray[skey].options.nodeId : selectedNodeId;
+        var metricKeyForSeries = seriesArray[skey].options.metricName;
+        if (nodes[nodeIdForSeries] && nodes[nodeIdForSeries].metrics && nodes[nodeIdForSeries].metrics[metricKeyForSeries]) {
+          var m = nodes[nodeIdForSeries].metrics[metricKeyForSeries];
+          seriesUnit = seriesUnit || m.unit || '';
+          seriesGraphValPrefix = seriesGraphValPrefix || m.graphValPrefix || '';
+          seriesGraphValSuffix = seriesGraphValSuffix || m.graphValSuffix || '';
+        }
+        for (var mk in metricsDef.metrics) {
+          var def = metricsDef.metrics[mk];
+          if (def && def.name == metricKeyForSeries) {
+            seriesUnit = seriesUnit || def.unit || '';
+            seriesGraphValPrefix = seriesGraphValPrefix || def.graphValPrefix || '';
+            seriesGraphValSuffix = seriesGraphValSuffix || def.graphValSuffix || '';
+            break;
+          }
+        }
+        var axisKey;
+        if (nodeGraphAxisMode === 'single') axisKey = 'single';
+        else if (nodeGraphAxisMode === 'unit') axisKey = seriesUnit || 'value';
+        else axisKey = 'series-'+skey;
+
+        var axisEntry = axisMap[axisKey];
+        if (!axisEntry) {
+          axisEntry = { index: axisIndex++, min: adjMin, max: adjMax, unit: seriesUnit, label: '', baseOptions: yaxisOptions, metricName: seriesArray[skey].options.metricName, nodeId: nodeIdForSeries, graphValPrefix: seriesGraphValPrefix, graphValSuffix: seriesGraphValSuffix };
+          axisMap[axisKey] = axisEntry;
+        } else {
+          axisEntry.min = Math.min(axisEntry.min, adjMin);
+          axisEntry.max = Math.max(axisEntry.max, adjMax);
+        }
+
+        seriesProcessed.push({
+          raw: seriesRaw,
+          context: seriesContext,
+          lines: lines,
+          points: points,
+          color: color,
+          axisKey: axisKey,
+          baseAxisOptions: yaxisOptions,
+          unit: seriesUnit,
+          metricName: seriesArray[skey].options.metricName,
+          nodeId: nodeIdForSeries,
+          graphValPrefix: seriesGraphValPrefix,
+          graphValSuffix: seriesGraphValSuffix
+        });
 
         //compute stats
         totalDataLength += seriesArray[skey].graphData.data.length;
@@ -1480,6 +1549,37 @@
         queryTime += seriesArray[skey].graphData.queryTime;
         logSize += seriesArray[skey].graphData.logSize;
       }
+
+      //build yaxes based on chosen mode
+      graphOptions.yaxes = [];
+      Object.keys(axisMap).forEach(function(key) {
+        var entry = axisMap[key];
+        var label;
+        if (nodeGraphAxisMode === 'single') label = 'Value';
+        else if (nodeGraphAxisMode === 'unit') label = entry.unit ? entry.unit : 'Value';
+        else label = entry.metricName || 'Series';
+        var opts = $.extend(true, {}, entry.baseOptions, {
+          position: ((entry.index%2)?'right':'left'),
+          min: entry.min,
+          max: entry.max,
+          axisLabel: label,
+          axisLabelUseCanvas:true,
+          axisLabelFontSizePixels:11,
+          metricName: entry.metricName,
+          nodeId: entry.nodeId,
+          unit: entry.unit,
+          graphValPrefix: entry.graphValPrefix,
+          graphValSuffix: entry.graphValSuffix
+        });
+        graphOptions.yaxes.push(opts);
+      });
+
+      //add data series with assigned axes
+      seriesProcessed.forEach(function(processed) {
+        var axisEntry = axisMap[processed.axisKey];
+        var yaxisIdx = axisEntry ? axisEntry.index : 1;
+        graphData.push({data:processed.raw, label:processed.context.legendLabel, yaxis:yaxisIdx, lines:processed.lines, points:processed.points, color:processed.color, unit:processed.unit, nodeId:processed.nodeId, metricName:processed.metricName, graphValPrefix:processed.graphValPrefix, graphValSuffix:processed.graphValSuffix});
+      });
 
       renderNodeGraphColorControls(seriesArray);
 
@@ -1653,20 +1753,16 @@
     }
 
     function resolveMetricLabel(nodeId, metricName, fallbackLabel) {
-      var node = nodes[nodeId];
-      if (node && node.metrics && node.metrics[metricName])
-        return node.metrics[metricName].label || metricName;
-      return fallbackLabel || metricName;
+      return metricName || fallbackLabel;
     }
 
     function resolveSeriesContext(seriesOptions) {
       seriesOptions = seriesOptions || {};
       var nodeId = seriesOptions.nodeId != undefined ? seriesOptions.nodeId : selectedNodeId;
-      var nodeLabel = getNodeDisplayName(nodeId, seriesOptions.nodeLabel || nodeId);
-      var metricLabel = resolveMetricLabel(nodeId, seriesOptions.metricName, seriesOptions.metricLabel || seriesOptions.metricName);
-      var legendBase = seriesOptions.legendLbl || metricLabel;
-      var legendLabel = legendBase + (nodeLabel ? ' ['+nodeLabel+']' : '');
-      return { nodeId: nodeId, nodeLabel: nodeLabel, metricLabel: metricLabel, legendLabel: legendLabel };
+      var metricLabel = resolveMetricLabel(nodeId, seriesOptions.metricName, seriesOptions.metricLabel || seriesOptions.legendLbl);
+      var legendBase = seriesOptions.metricName || seriesOptions.legendLbl || metricLabel;
+      var legendLabel = legendBase; //metric-focused label
+      return { nodeId: nodeId, nodeLabel: null, metricLabel: metricLabel, legendLabel: legendLabel };
     }
 
     function updateNodeGraphHeightDisplay() {
@@ -1773,24 +1869,17 @@
     }
 
     function renderNodeGraphColorControls(seriesArray) {
-      if (!nodeGraphColorPanel || !nodeGraphColorControls) return;
+      if (!nodeGraphControls || !nodeGraphColorControls) return;
       var node = nodes[selectedNodeId];
       if (!seriesArray || !node || !node.multiGraphs || !node.multiGraphs[0]) {
-        nodeGraphColorPanel.hide();
         nodeGraphColorControls.hide();
-        nodeGraphColorToggle.text('Show color palette');
-        nodeGraphColorsExpanded=false;
         return;
       }
       var selections = node.multiGraphs[0];
       if (!selections || !selections.length) {
-        nodeGraphColorPanel.hide();
         nodeGraphColorControls.hide();
-        nodeGraphColorToggle.text('Show color palette');
-        nodeGraphColorsExpanded=false;
         return;
       }
-      nodeGraphColorPanel.show();
       nodeGraphColorControls.empty();
       selections.forEach(function(selection, index) {
         var normalizedEntry = ensureMultiGraphEntryObject(selection, node._id);
@@ -1819,13 +1908,7 @@
         row.append(palette);
         nodeGraphColorControls.append(row);
       });
-      if (nodeGraphColorsExpanded) {
-        nodeGraphColorControls.show();
-        nodeGraphColorToggle.text('Hide color palette');
-      } else {
-        nodeGraphColorControls.hide();
-        nodeGraphColorToggle.text('Show color palette');
-      }
+      nodeGraphColorControls.show();
     }
 
     function metricsValues(metrics, ignorePin) {
@@ -2214,10 +2297,10 @@
             graphView.resetDomain();
             refreshMultiGraph();
           }
-          nodeGraphHeightPanel.show();
-          if (!nodeGraphHeightExpanded) {
-            nodeGraphHeightControls.hide();
-            nodeGraphHeightToggle.text('Show height controls');
+          nodeGraphControlsPanel.show();
+          if (!nodeGraphControlsExpanded) {
+            nodeGraphControls.hide();
+            nodeGraphControlsToggle.text('Show multigraph controls');
           }
         }
         else
@@ -2226,14 +2309,10 @@
           $("div[ui-role='loadingnodemultigraph']").hide();
           $("#addNodeGraphWrapper").show();
           $("#editNodeGraphWrapper").hide();
-          nodeGraphHeightPanel.hide();
-          nodeGraphHeightControls.hide();
-          nodeGraphHeightToggle.text('Show height controls');
-          nodeGraphHeightExpanded=false;
-          nodeGraphColorPanel.hide();
-          nodeGraphColorControls.hide();
-          nodeGraphColorToggle.text('Show color palette');
-          nodeGraphColorsExpanded=false;
+          nodeGraphControlsPanel.hide();
+          nodeGraphControls.hide();
+          nodeGraphControlsToggle.text('Show multigraph controls');
+          nodeGraphControlsExpanded=false;
         }
 
         $('#nodeMultigraphSection').show();
@@ -2241,14 +2320,10 @@
       else {
         $('#nodeMultigraphSection').hide();
         $("#editNodeGraphWrapper").hide();
-        nodeGraphHeightPanel.hide();
-        nodeGraphHeightControls.hide();
-        nodeGraphHeightToggle.text('Show height controls');
-        nodeGraphHeightExpanded=false;
-        nodeGraphColorPanel.hide();
-        nodeGraphColorControls.hide();
-        nodeGraphColorToggle.text('Show color palette');
-        nodeGraphColorsExpanded=false;
+        nodeGraphControlsPanel.hide();
+        nodeGraphControls.hide();
+        nodeGraphControlsToggle.text('Show multigraph controls');
+        nodeGraphControlsExpanded=false;
       }
 
       //populate events list
@@ -2592,6 +2667,11 @@
       addNodeGraphOptions.empty();
       addNodeGraphMsg.hide();
       var hasOptions = false;
+      if (!nodes || Object.keys(nodes).length === 0) {
+        addNodeGraphOptions.append('<p class="center-wrapper">No nodes available.</p>');
+        addNodeGraphOptions.trigger('create');
+        return;
+      }
       var preselectedKeys = [];
       if (Array.isArray(preselectedEntries)) {
         preselectedEntries.forEach(function(entry) {
