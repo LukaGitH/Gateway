@@ -475,6 +475,9 @@
         <div id="addNodeGraphWrapper" data-role="controlgroup" data-type="horizontal" class="center-wrapper">
           <a id="addNodeGraph" href="#addNodeGraphPage" data-role="button" data-icon="plus" style="background-color:#9BFFBE" title="Create new graph from logged metrics">MultiGraph</a>
         </div>
+        <div id="editNodeGraphWrapper" data-role="controlgroup" data-type="horizontal" class="center-wrapper" style="display:none;">
+          <a id="editNodeGraph" href="#addNodeGraphPage" data-role="button" data-icon="fa-edit" style="background-color:#daca25" title="Edit existing multigraph">Edit MultiGraph</a>
+        </div>
       </div>
       
       <ul id="metricList" data-role="listview" data-inset="true" data-theme="a" data-dividertheme="b"></ul>
@@ -569,7 +572,7 @@
       </div>
     </div>
   </div>
-
+  
   <div data-role="page" id="addEmptyNodePage" data-dialog="true">
     <div data-role="main" class="ui-content">
       <div class="center-wrapper" style="padding:20px">
@@ -579,6 +582,10 @@
       <div class="center-wrapper" style="padding:20px">
         <span id="addEmptyNode_msg" style="padding-bottom:10px;color:red;display:block">error</span>
         <a id="addEmptyNode_OK" href="#homepage" class="ui-btn ui-btn-inline ui-btn-b ui-shadow ui-corner-all ui-icon-check ui-btn-icon-left ui-mini" data-rel="homepage" style="background-color:#9BFFBE;color:#000;">Add</a>
+        <a href="#" class="ui-btn ui-btn-inline ui-shadow ui-corner-all ui-mini ui-icon-back ui-btn-icon-left" data-rel="back">Cancel</a>
+      </div>
+    </div>
+  </div>
 
   <div data-role="page" id="metricdetails">
     <div data-role="header">
@@ -1178,10 +1185,11 @@
       }
     }
     
+    nodeMultiGraphWrapper = $('#nodeMultiGraphWrapper');
+    nodeMultiGraph = $('#nodeMultiGraph');
+    var nodeGraphEditMode = false;
     var addNodeGraphOptions = $('#addNodeGraphOptions');
     var addNodeGraphMsg = $('#addNodeGraphMsg');
-    var nodeMultiGraphWrapper = $('#nodeMultiGraphWrapper');
-    var nodeMultiGraph = $('#nodeMultiGraph');
     var nodeGraphHeightPanel = $('#nodeGraphHeightPanel');
     var nodeGraphHeightToggle = $('#nodeGraphHeightToggle');
     var nodeGraphHeightControls = $('#nodeGraphHeightControls');
@@ -1697,41 +1705,6 @@
       return px;
     }
 
-    function sanitizeOptionId(nodeId, metricKey) {
-      var safeNode = String(nodeId).replace(/[^a-z0-9]/gi,'_');
-      var safeMetric = String(metricKey).replace(/[^a-z0-9]/gi,'_');
-      return 'node-mg-'+safeNode+'-'+safeMetric;
-    }
-
-    function populateNodeGraphOptions() {
-      addNodeGraphOptions.empty();
-      addNodeGraphMsg.hide();
-      var hasOptions = false;
-      var nodeList = Object.keys(nodes).map(function(nodeKey) { return nodes[nodeKey]; }).filter(function(node) { return !!node; });
-      nodeList.sort(function(a, b) {
-        var labelA = (getNodeDisplayName(a._id) || '').toString().toLowerCase();
-        var labelB = (getNodeDisplayName(b._id) || '').toString().toLowerCase();
-        if (labelA === labelB) return (''+a._id).localeCompare(''+b._id, undefined, {numeric:true});
-        return labelA.localeCompare(labelB);
-      });
-      nodeList.forEach(function(node) {
-        if (!node.metrics) return;
-        Object.keys(node.metrics).forEach(function(metricKey) {
-          var metric = node.metrics[metricKey];
-          if (!metric || !metric.graph) return;
-          hasOptions = true;
-          var optionId = sanitizeOptionId(node._id, metricKey);
-          var checkbox = $('<input type="checkbox">').attr({id:optionId, value:(node._id+'::'+metricKey)});
-          var label = $('<label></label>').attr('for', optionId).text((metric.label || metricKey)+' ['+node._id+']');
-          addNodeGraphOptions.append(checkbox).append(label);
-        });
-      });
-      if (!hasOptions) {
-        addNodeGraphOptions.append('<p class="center-wrapper">No logged metrics available for multigraphs.</p>');
-      }
-      addNodeGraphOptions.trigger('create');
-    }
-
     function paletteColor(index) {
       return multiGraphColorPalette[index % multiGraphColorPalette.length];
     }
@@ -1765,6 +1738,19 @@
         return entry;
       }
       return null;
+    }
+
+    function sanitizeOptionId(nodeId, metricKey) {
+      var safeNode = String(nodeId).replace(/[^a-z0-9]/gi,'_');
+      var safeMetric = String(metricKey).replace(/[^a-z0-9]/gi,'_');
+      return 'node-mg-'+safeNode+'-'+safeMetric;
+    }
+
+    function multiGraphSelectionKey(entry, defaultNodeId) {
+      var normalized = ensureMultiGraphEntryObject(entry, defaultNodeId);
+      if (!normalized || !normalized.metricKey) return null;
+      var nodeId = normalized.nodeId != undefined ? normalized.nodeId : defaultNodeId;
+      return nodeId + '::' + normalized.metricKey;
     }
 
     function getNodeMultiGraphEntry(index) {
@@ -2218,6 +2204,8 @@
         //show node multigraphs
         if (node.multiGraphs)
         {
+          $("#addNodeGraphWrapper").hide();
+          $("#editNodeGraphWrapper").show();
           if (!nodeMultiGraph.is(':visible'))
           {
             nodeMultiGraphWrapper.hide(); //hide graph div while loading data
@@ -2225,7 +2213,6 @@
             graphData=[];
             graphView.resetDomain();
             refreshMultiGraph();
-            $("#addNodeGraphWrapper").hide();
           }
           nodeGraphHeightPanel.show();
           if (!nodeGraphHeightExpanded) {
@@ -2238,6 +2225,7 @@
           nodeMultiGraphWrapper.hide();
           $("div[ui-role='loadingnodemultigraph']").hide();
           $("#addNodeGraphWrapper").show();
+          $("#editNodeGraphWrapper").hide();
           nodeGraphHeightPanel.hide();
           nodeGraphHeightControls.hide();
           nodeGraphHeightToggle.text('Show height controls');
@@ -2252,6 +2240,7 @@
       }
       else {
         $('#nodeMultigraphSection').hide();
+        $("#editNodeGraphWrapper").hide();
         nodeGraphHeightPanel.hide();
         nodeGraphHeightControls.hide();
         nodeGraphHeightToggle.text('Show height controls');
@@ -2599,9 +2588,52 @@
       $('#nodeIconUpload').val('');
     });
 
+    function populateNodeGraphOptions(preselectedEntries) {
+      addNodeGraphOptions.empty();
+      addNodeGraphMsg.hide();
+      var hasOptions = false;
+      var preselectedKeys = [];
+      if (Array.isArray(preselectedEntries)) {
+        preselectedEntries.forEach(function(entry) {
+          var key = multiGraphSelectionKey(entry, selectedNodeId);
+          if (key) preselectedKeys.push(key);
+        });
+      }
+      var nodeList = Object.keys(nodes).map(function(nodeKey) { return nodes[nodeKey]; }).filter(function(node) { return !!node; });
+      nodeList.sort(function(a, b) {
+        var labelA = (getNodeDisplayName(a._id) || '').toString().toLowerCase();
+        var labelB = (getNodeDisplayName(b._id) || '').toString().toLowerCase();
+        if (labelA === labelB) return (''+a._id).localeCompare(''+b._id, undefined, {numeric:true});
+        return labelA.localeCompare(labelB);
+      });
+      nodeList.forEach(function(node) {
+        if (!node.metrics) return;
+        Object.keys(node.metrics).forEach(function(metricKey) {
+          var metric = node.metrics[metricKey];
+          if (!metric || !metric.graph) return;
+          hasOptions = true;
+          var optionId = sanitizeOptionId(node._id, metricKey);
+          var checkbox = $('<input type="checkbox">').attr({id:optionId, value:(node._id+'::'+metricKey)});
+          if (preselectedKeys.indexOf(node._id+'::'+metricKey) !== -1) checkbox.prop('checked', true);
+          var label = $('<label></label>').attr('for', optionId).text((metric.label || metricKey)+' ['+node._id+']');
+          addNodeGraphOptions.append(checkbox).append(label);
+        });
+      });
+      if (!hasOptions) {
+        addNodeGraphOptions.append('<p class="center-wrapper">No logged metrics available for multigraphs.</p>');
+      }
+      addNodeGraphOptions.trigger('create');
+    }
 
     $('#addNodeGraph').click("tap", function(event) {
+      nodeGraphEditMode = false;
       populateNodeGraphOptions();
+    });
+
+    $('#editNodeGraph').click("tap", function(event) {
+      nodeGraphEditMode = true;
+      var existing = (nodes[selectedNodeId] && nodes[selectedNodeId].multiGraphs && nodes[selectedNodeId].multiGraphs[0]) ? nodes[selectedNodeId].multiGraphs[0] : [];
+      populateNodeGraphOptions(existing);
     });
 
     $('#addEmptyNode').click("tap", function(event) {
@@ -2652,7 +2684,10 @@
         addNodeGraphMsg.text('Select at least two metrics.').show();
         return;
       }
-      socket.emit('ADDNODEGRAPH', selectedNodeId, selections);
+      if (nodeGraphEditMode)
+        socket.emit('SETNODEGRAPH', selectedNodeId, selections);
+      else
+        socket.emit('ADDNODEGRAPH', selectedNodeId, selections);
       $.mobile.navigate('#nodedetails');
     }
     $("#addNodeGraphDone").click(function(event) {
@@ -2899,6 +2934,13 @@
         $("#graphDeleteDataToggle").removeClass('active').css('background-color','');
         $("#graphEditDataToggle").removeClass('active').css('background-color','');
       }
+    });
+
+    $('#addNodeGraphPage').on('pagebeforeshow', function(event){
+      addNodeGraphMsg.hide();
+      var boxes = addNodeGraphOptions.find('input[type=checkbox]');
+      boxes.prop('checked', false);
+      if (boxes.checkboxradio) boxes.checkboxradio('refresh');
     });
 
     $('#addEvent').on('pagebeforeshow', function(event){
